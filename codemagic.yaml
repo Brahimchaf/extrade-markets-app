@@ -8,6 +8,7 @@ definitions:
   s_install: &s_install
     name: Install dependencies (upgrade to Expo SDK 54 for Xcode 26)
     script: |
+      npm config set legacy-peer-deps true
       npm install --no-audit --no-fund
       npm install expo@~54.0.0 --no-audit --no-fund
       npx expo install --fix
