@@ -1,0 +1,39 @@
+{
+  "expo": {
+    "name": "ExTrade Markets",
+    "slug": "extrade-markets",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "extrademarkets",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0b0f14"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.extrademarkets.app",
+      "buildNumber": "1",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "package": "com.extrademarkets.app",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0b0f14"
+      }
+    },
+    "plugins": ["expo-router", "expo-localization"],
+    "extra": {
+      "eas": {
+        "projectId": ""
+      }
+    }
+  }
+}
