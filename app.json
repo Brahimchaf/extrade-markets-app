@@ -1,7 +1,8 @@
 {
   "expo": {
     "name": "ExTrade Markets",
-    "slug": "extrade-markets",
+    "slug": "trade-app",
+    "owner": "ceonaval",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -16,14 +17,14 @@
     "assetBundlePatterns": ["**/*"],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.extrademarkets.app",
-      "buildNumber": "1",
+      "bundleIdentifier": "com.yourname.tradeapp",
+      "buildNumber": "2",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
-      "package": "com.extrademarkets.app",
+      "package": "com.yourname.tradeapp",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#000000"
@@ -32,7 +33,7 @@
     "plugins": ["expo-router", "expo-localization"],
     "extra": {
       "eas": {
-        "projectId": ""
+        "projectId": "2a9a5a4d-ec71-413e-94dd-84dbeaf7f8ca"
       }
     }
   }
