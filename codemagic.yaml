@@ -1,0 +1,130 @@
+definitions:
+  env: &env
+    xcode: latest
+    node: 20
+    cocoapods: default
+    vars:
+      BUNDLE_ID: "com.yourname.tradeapp"
+  s_install: &s_install
+    name: Install dependencies
+    script: npm install --no-audit --no-fund
+  s_config: &s_config
+    name: Configure app (iPhone only, version 1.0)
+    script: |
+      node -e '
+      const fs=require("fs");const a=JSON.parse(fs.readFileSync("app.json"));
+      a.expo.version="1.0";a.expo.ios.supportsTablet=false;
+      fs.writeFileSync("app.json",JSON.stringify(a,null,2));'
+  s_prebuild: &s_prebuild
+    name: Expo prebuild
+    script: npx expo prebuild --platform ios --clean --no-install
+  s_pods: &s_pods
+    name: Pod install
+    script: cd ios && pod install
+
+workflows:
+  ios-release:
+    name: ExTrade Markets - App Store build
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+    integrations:
+      app_store_connect: JupiterChart ASC key
+    environment: *env
+    scripts:
+      - *s_install
+      - *s_config
+      - *s_prebuild
+      - *s_pods
+      - name: Set up keychain
+        script: keychain initialize
+      - name: Fetch or create signing files
+        script: |
+          ssh-keygen -t rsa -b 2048 -m PEM -f /tmp/cert_key -q -N ""
+          app-store-connect fetch-signing-files "$BUNDLE_ID" \
+            --type IOS_APP_STORE \
+            --certificate-key=@file:/tmp/cert_key \
+            --create
+      - name: Add certificates to keychain
+        script: keychain add-certificates
+      - name: Use signing profiles
+        script: xcode-project use-profiles
+      - name: Set build number
+        script: |
+          PLIST=$(find ios -maxdepth 2 -name Info.plist -not -path "*/Pods/*" | head -1)
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $((BUILD_NUMBER + 10))" "$PLIST"
+          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 1.0" "$PLIST"
+      - name: Build IPA
+        script: |
+          WS=$(ls -d ios/*.xcworkspace | head -1)
+          SCHEME=$(basename "$WS" .xcworkspace)
+          xcode-project build-ipa --workspace "$WS" --scheme "$SCHEME"
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: false
+        submit_to_app_store: false
+
+  screenshots:
+    name: ExTrade Markets - App Store screenshots
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+    integrations:
+      app_store_connect: JupiterChart ASC key
+    environment: *env
+    scripts:
+      - *s_install
+      - *s_config
+      - *s_prebuild
+      - *s_pods
+      - name: Build for simulator
+        script: |
+          WS=$(ls -d ios/*.xcworkspace | head -1)
+          SCHEME=$(basename "$WS" .xcworkspace)
+          xcodebuild -workspace "$WS" -scheme "$SCHEME" \
+            -sdk iphonesimulator -configuration Release \
+            -derivedDataPath build/dd CODE_SIGNING_ALLOWED=NO build | tail -20
+      - name: Capture screenshots
+        script: |
+          set -e
+          DEV=$(xcrun simctl list devices available | grep -i "Pro Max" | tail -1 | grep -oE "[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}")
+          echo "Using device $DEV"
+          xcrun simctl boot "$DEV" || true
+          xcrun simctl bootstatus "$DEV" -b
+          xcrun simctl status_bar "$DEV" override --time 9:41 --batteryState charged --batteryLevel 100 --cellularMode active --cellularBars 4 --wifiBars 3
+          APP=$(find build/dd -name "*.app" -path "*iphonesimulator*" | head -1)
+          xcrun simctl install "$DEV" "$APP"
+          mkdir -p shots/en-US
+          xcrun simctl launch "$DEV" "$BUNDLE_ID"
+          sleep 25
+          xcrun simctl io "$DEV" screenshot shots/en-US/1_markets.png
+          xcrun simctl openurl "$DEV" "extrademarkets://news"
+          sleep 20
+          xcrun simctl io "$DEV" screenshot shots/en-US/2_news.png
+          xcrun simctl openurl "$DEV" "extrademarkets://analysis"
+          sleep 20
+          xcrun simctl io "$DEV" screenshot shots/en-US/3_analysis.png
+          sips -g pixelWidth -g pixelHeight shots/en-US/*.png
+      - name: Upload screenshots to App Store Connect
+        script: |
+          python3 -c 'import json,os; json.dump({"key_id":os.environ["APP_STORE_CONNECT_KEY_IDENTIFIER"],"issuer_id":os.environ["APP_STORE_CONNECT_ISSUER_ID"],"key":os.environ["APP_STORE_CONNECT_PRIVATE_KEY"],"in_house":False},open("/tmp/asc_key.json","w"))'
+          mkdir -p fastlane && touch fastlane/Deliverfile
+          export FASTLANE_SKIP_UPDATE_CHECK=1 FASTLANE_HIDE_CHANGELOG=1
+          fastlane deliver \
+            --api_key_path /tmp/asc_key.json \
+            --app_identifier "$BUNDLE_ID" \
+            --app_version "1.0" \
+            --platform ios \
+            --skip_binary_upload true \
+            --skip_metadata true \
+            --skip_app_version_update true \
+            --screenshots_path shots \
+            --overwrite_screenshots true \
+            --submit_for_review false \
+            --run_precheck_before_submit false \
+            --force true
+          rm -f /tmp/asc_key.json
+    artifacts:
+      - shots/en-US/*.png
